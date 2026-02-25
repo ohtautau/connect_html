@@ -1,0 +1,173 @@
+<html lang='en'>
+<head>
+    <meta charset='UTF-8'>
+    <link href="dist/main.css" rel="stylesheet"/>
+</head>
+<body>
+<div>
+    <form>
+        <details
+                class="w-full border border-brand-primary-main dark:border-dark-100 rounded-md cr-bg-tertiary cr-text-primary">
+            <summary class="py-3 px-4 font-bold cr-text-secondary cursor-pointer">
+                Instructions
+            </summary>
+            <div class="pb-3 px-4 ql-editor ql-display !min-h-0">
+                {{ task.instructions ?? 'No instructions provided.'}}
+            </div>
+        </details>
+
+        <!-- raw convo data (hidden) -->
+        <div class="convo-raw" style="display:none">{{ task.row_data['convo1'] }}</div>
+        <div class="convo-raw" style="display:none">{{ task.row_data['convo2'] }}</div>
+        <div class="convo-raw" style="display:none">{{ task.row_data['convo3'] }}</div>
+        <div class="convo-raw" style="display:none">{{ task.row_data['convo4'] }}</div>
+        <div class="convo-raw" style="display:none">{{ task.row_data['convo5'] }}</div>
+        <div class="convo-raw" style="display:none">{{ task.row_data['convo6'] }}</div>
+        <div class="convo-raw" style="display:none">{{ task.row_data['convo7'] }}</div>
+        <div class="convo-raw" style="display:none">{{ task.row_data['convo8'] }}</div>
+        <div class="convo-raw" style="display:none">{{ task.row_data['convo9'] }}</div>
+        <div class="convo-raw" style="display:none">{{ task.row_data['convo10'] }}</div>
+        <div class="convo-raw" style="display:none">{{ task.row_data['convo11'] }}</div>
+        <div class="convo-raw" style="display:none">{{ task.row_data['convo12'] }}</div>
+        <div class="convo-raw" style="display:none">{{ task.row_data['convo13'] }}</div>
+        <div class="convo-raw" style="display:none">{{ task.row_data['convo14'] }}</div>
+        <div class="convo-raw" style="display:none">{{ task.row_data['convo15'] }}</div>
+        <div class="convo-raw" style="display:none">{{ task.row_data['convo16'] }}</div>
+        <div class="convo-raw" style="display:none">{{ task.row_data['convo17'] }}</div>
+        <div class="convo-raw" style="display:none">{{ task.row_data['convo18'] }}</div>
+        <div class="convo-raw" style="display:none">{{ task.row_data['convo19'] }}</div>
+        <div class="convo-raw" style="display:none">{{ task.row_data['convo20'] }}</div>
+
+        <!-- hidden answer inputs -->
+        <input type="hidden" name="answer_convo1" id="answer_convo1" value="">
+        <input type="hidden" name="answer_convo2" id="answer_convo2" value="">
+        <input type="hidden" name="answer_convo3" id="answer_convo3" value="">
+        <input type="hidden" name="answer_convo4" id="answer_convo4" value="">
+        <input type="hidden" name="answer_convo5" id="answer_convo5" value="">
+        <input type="hidden" name="answer_convo6" id="answer_convo6" value="">
+        <input type="hidden" name="answer_convo7" id="answer_convo7" value="">
+        <input type="hidden" name="answer_convo8" id="answer_convo8" value="">
+        <input type="hidden" name="answer_convo9" id="answer_convo9" value="">
+        <input type="hidden" name="answer_convo10" id="answer_convo10" value="">
+        <input type="hidden" name="answer_convo11" id="answer_convo11" value="">
+        <input type="hidden" name="answer_convo12" id="answer_convo12" value="">
+        <input type="hidden" name="answer_convo13" id="answer_convo13" value="">
+        <input type="hidden" name="answer_convo14" id="answer_convo14" value="">
+        <input type="hidden" name="answer_convo15" id="answer_convo15" value="">
+        <input type="hidden" name="answer_convo16" id="answer_convo16" value="">
+        <input type="hidden" name="answer_convo17" id="answer_convo17" value="">
+        <input type="hidden" name="answer_convo18" id="answer_convo18" value="">
+        <input type="hidden" name="answer_convo19" id="answer_convo19" value="">
+        <input type="hidden" name="answer_convo20" id="answer_convo20" value="">
+
+        <!-- progress -->
+        <div style="height:6px; background:#e0e0e0; border-radius:3px; margin:12px 0; overflow:hidden;">
+            <div id="progressFill" style="height:100%; background:#4a90d9; width:0%; transition:width .3s;"></div>
+        </div>
+        <div id="progressText" style="text-align:center; font-size:14px; color:#555;"></div>
+
+        <!-- conversation display -->
+        <div style="border:1px solid #d0d0d0; border-radius:8px; padding:20px; margin:16px 0; background:#fafafa;">
+            <div id="convoTitle" style="font-size:16px; font-weight:bold; margin-bottom:12px; padding-bottom:8px; border-bottom:2px solid #4a90d9;"></div>
+            <div id="convoBody" style="white-space:pre-wrap; line-height:1.7; font-size:14px; color:#333;"></div>
+        </div>
+
+        <!-- question -->
+        <div style="margin:20px 0; padding:16px; background:#eef5fc; border-left:4px solid #4a90d9; border-radius:0 6px 6px 0;">
+            <p style="font-weight:600; margin:0 0 12px 0;">Does this conversation contain any issues?</p>
+            <label style="margin-right:24px;"><input type="radio" name="currentAnswer" value="Yes"> Yes</label>
+            <label><input type="radio" name="currentAnswer" value="No"> No</label>
+        </div>
+
+        <!-- navigation -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin:24px 0;">
+            <button type="button" id="prevBtn" onclick="go(-1)" style="padding:10px 28px; border:none; border-radius:6px; font-size:14px; font-weight:600; cursor:pointer; color:#fff; background:#6c757d;">&#8592; Previous</button>
+            <span id="pageNum" style="font-size:14px; color:#555;"></span>
+            <button type="button" id="nextBtn" onclick="go(1)" style="padding:10px 28px; border:none; border-radius:6px; font-size:14px; font-weight:600; cursor:pointer; color:#fff; background:#4a90d9;">Next &#8594;</button>
+        </div>
+
+        <!-- submit -->
+        <div id="submitRow" style="text-align:center; margin:20px 0; display:none;">
+            <button type="submit" id="submitBtn" disabled style="padding:12px 48px; font-size:15px; font-weight:600; border:none; border-radius:6px; background:#28a745; color:#fff; cursor:pointer;">Submit</button>
+        </div>
+    </form>
+</div>
+
+<script>
+(function () {
+    /* parse all convo data from hidden divs */
+    var slots = document.querySelectorAll('.convo-raw');
+    var convos = [];
+    for (var i = 0; i < slots.length; i++) {
+        var raw = slots[i].textContent.trim();
+        if (!raw) continue;
+        try { convos.push(JSON.parse(raw)); } catch(e) { /* skip */ }
+    }
+    var total = convos.length;
+    var cur = 0;
+    var radios = document.querySelectorAll('input[name="currentAnswer"]');
+
+    function getAnswer(idx) {
+        var el = document.getElementById('answer_convo' + (idx + 1));
+        return el ? el.value : '';
+    }
+    function setAnswer(idx, val) {
+        var el = document.getElementById('answer_convo' + (idx + 1));
+        if (el) el.value = val;
+    }
+    function countAnswered() {
+        var n = 0;
+        for (var k = 0; k < total; k++) { if (getAnswer(k)) n++; }
+        return n;
+    }
+    function saveCurrent() {
+        for (var j = 0; j < radios.length; j++) {
+            if (radios[j].checked) { setAnswer(cur, radios[j].value); return; }
+        }
+    }
+    function render() {
+        var c = convos[cur];
+        document.getElementById('convoTitle').textContent = (c && c.text && c.text.Title) || '';
+        document.getElementById('convoBody').textContent = (c && c.text && c.text.Conversation) || '';
+
+        var saved = getAnswer(cur);
+        for (var j = 0; j < radios.length; j++) {
+            radios[j].checked = (radios[j].value === saved);
+        }
+
+        document.getElementById('prevBtn').disabled = (cur === 0);
+        var isLast = (cur === total - 1);
+        document.getElementById('nextBtn').style.display = isLast ? 'none' : '';
+        document.getElementById('submitRow').style.display = isLast ? '' : 'none';
+
+        var answered = countAnswered();
+        document.getElementById('progressFill').style.width = (answered / total * 100) + '%';
+        document.getElementById('progressText').textContent = 'Answered ' + answered + ' / ' + total;
+        document.getElementById('pageNum').textContent = (cur + 1) + ' / ' + total;
+        document.getElementById('submitBtn').disabled = (answered < total);
+    }
+
+    for (var r = 0; r < radios.length; r++) {
+        radios[r].addEventListener('change', function () {
+            saveCurrent();
+            var answered = countAnswered();
+            document.getElementById('progressFill').style.width = (answered / total * 100) + '%';
+            document.getElementById('progressText').textContent = 'Answered ' + answered + ' / ' + total;
+            document.getElementById('submitBtn').disabled = (answered < total);
+        });
+    }
+
+    window.go = function (dir) {
+        saveCurrent();
+        var next = cur + dir;
+        if (next < 0 || next >= total) return;
+        cur = next;
+        render();
+        window.scrollTo(0, 0);
+    };
+
+    if (total > 0) render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,50 @@
+<html lang='en'>
+<head>
+    <meta charset='UTF-8'>
+    <link href="dist/main.css" rel="stylesheet"/>
+</head>
+<body>
+<div>
+    <form>
+        <details
+                class="w-full border border-brand-primary-main dark:border-dark-100 rounded-md cr-bg-tertiary cr-text-primary">
+            <summary class="py-3 px-4 font-bold cr-text-secondary cursor-pointer">
+                Instructions
+            </summary>
+            <div class="pb-3 px-4 ql-editor ql-display !min-h-0">
+                {{ task.instructions ?? 'No instructions provided.'}}
+            </div>
+        </details>
+
+        <!-- raw data hidden in DOM -->
+        <div id="convoRaw" style="display:none">{{ task.row_data['convo1'] }}</div>
+
+        <div style="border:1px solid #d0d0d0; border-radius:8px; padding:20px; margin:16px 0; background:#fafafa;">
+            <div id="convoTitle" style="font-size:16px; font-weight:bold; margin-bottom:12px; padding-bottom:8px; border-bottom:2px solid #4a90d9;"></div>
+            <div id="convoBody" style="white-space:pre-wrap; line-height:1.7; font-size:14px; color:#333;"></div>
+        </div>
+
+        <div style="margin:20px 0; padding:16px; background:#eef5fc; border-left:4px solid #4a90d9; border-radius:0 6px 6px 0;">
+            <p style="font-weight:600; margin:0 0 12px 0;">Does this conversation contain any issues?</p>
+            <label style="margin-right:24px;"><input type="radio" name="answer_convo1" value="Yes"> Yes</label>
+            <label><input type="radio" name="answer_convo1" value="No"> No</label>
+        </div>
+
+        <button type="submit">Submit</button>
+    </form>
+</div>
+
+<script>
+(function () {
+    try {
+        var raw = document.getElementById('convoRaw').textContent.trim();
+        var data = JSON.parse(raw);
+        document.getElementById('convoTitle').textContent = (data.text && data.text.Title) || '';
+        document.getElementById('convoBody').textContent = (data.text && data.text.Conversation) || '';
+    } catch (e) {
+        document.getElementById('convoBody').textContent = document.getElementById('convoRaw').textContent;
+    }
+})();
+</script>
+</body>
+</html>

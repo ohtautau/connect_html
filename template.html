@@ -1,0 +1,39 @@
+<html lang='en'>
+<head>
+    <meta charset='UTF-8'>
+    <!-- Includes some basic styling but can be removed if you want to control all css -->
+    <link href="dist/main.css" rel="stylesheet"/>
+    <!-- Include AWS Crowd HTML scripts if using -->
+    <!-- <script src="https://assets.crowd.aws/crowd-html-elements.js"></script> -->
+</head>
+<body>
+<div>
+    <!-- Replace <form> with <crowd-form> if using AWS Crowd HTML -->
+    <form>
+        <details
+                class="w-full border border-brand-primary-main dark:border-dark-100 rounded-md cr-bg-tertiary cr-text-primary">
+            <summary class="py-3 px-4 font-bold cr-text-secondary cursor-pointer">
+                Instructions
+            </summary>
+            <div class="pb-3 px-4 ql-editor ql-display !min-h-0">
+                {{ task.instructions ?? 'No instructions provided.'}}
+                {{  task.row_data['convo1'] }}
+            </div>
+        </details>
+        
+            <div class="pb-3 px-4 ql-editor ql-display !min-h-0">
+                {{  task.row_data['convo1'] }}
+            </div>
+        <button type="submit">
+            Submit
+        </button>
+    </form>
+</div>
+</body>
+</html>
+
+<!-- 
+You can embed the data into your html using the syntax. {{ variable }}
+Your html will need a element and your code will need to submit the form to have the Participant complete the task. All form elements will be submitted so make sure that they have unique attributes.
+
+If using AWS Crowd Elements then your code should include the necessary javascript files and have only one element. <form>name <script src="https://assets.crowd.aws/crowd-html-elements.js"></script> <crowd-form> -->
