@@ -44,28 +44,24 @@ def get_annotators_info(total_data: int) -> tuple:
         except ValueError:
             print("输入无效，请输入一个整数。")
 
-    # 计算需要的标注者数量
-    num_annotators = (total_data + count_per_annotator - 1) // count_per_annotator
+    # 计算需要的标注者数量（只分配完整批次，多余数据不分配）
+    num_annotators = total_data // count_per_annotator
+    remaining = total_data - num_annotators * count_per_annotator
 
-    print(f"\n根据数据量，将创建 {num_annotators} 个标注者")
-    print(f"前 {num_annotators - 1} 个标注者各标注 {count_per_annotator} 条")
-
-    remaining = total_data - (num_annotators - 1) * count_per_annotator
-    print(f"最后一个标注者标注 {remaining} 条")
+    print(f"\n将创建 {num_annotators} 个标注者，每人标注 {count_per_annotator} 条")
+    if remaining > 0:
+        print(f"剩余 {remaining} 条数据不会被分配")
 
     # 创建标注者列表
     annotators = []
     for i in range(1, num_annotators + 1):
-        if i < num_annotators:
-            annotators.append((str(i), count_per_annotator))
-        else:
-            annotators.append((str(i), remaining))
+        annotators.append((str(i), count_per_annotator))
 
     return annotators, count_per_annotator
 
 
-def allocate_data(data: List[Dict], annotators: List[tuple]) -> Dict[str, List[Dict]]:
-    """将数据分配给标注者"""
+def allocate_data(data: List[Dict], annotators: List[tuple]) -> tuple:
+    """将数据分配给标注者，返回(已分配, 未分配)"""
     allocation = {}
     current_idx = 0
     total_needed = sum(count for _, count in annotators)
@@ -73,33 +69,27 @@ def allocate_data(data: List[Dict], annotators: List[tuple]) -> Dict[str, List[D
     print(f"\n总共需要分配 {total_needed} 条对话")
     print(f"数据集包含 {len(data)} 条对话")
 
-    if total_needed > len(data):
-        print(f"\n警告：需要的对话数量({total_needed})超过了数据集大小({len(data)})")
-        response = input("是否继续分配可用的数据？(y/n): ").strip().lower()
-        if response != 'y':
-            print("分配已取消。")
-            sys.exit(0)
-
     for name, count in annotators:
         allocated_items = []
-        for _ in range(min(count, len(data) - current_idx)):
+        for _ in range(count):
             allocated_items.append(data[current_idx])
             current_idx += 1
-
         allocation[name] = allocated_items
-        print(f"已为 {name} 分配 {len(allocated_items)} 条对话")
+        print(f"已为标注者{name}分配 {len(allocated_items)} 条对话")
 
-        if current_idx >= len(data):
-            print(f"\n警告：数据已用完，后续标注者可能无法获得足够的数据。")
-            break
+    unallocated = data[current_idx:]
+    if unallocated:
+        print(f"\n未分配: {len(unallocated)} 条对话")
 
-    return allocation
+    return allocation, unallocated
 
 
 def save_csv(allocation: Dict[str, List[Dict]], output_path: str, convos_per_annotator: int):
     """保存为CSV格式"""
-    # 准备CSV头部，列数由每个标注者需要标注的数量决定
-    headers = ['Participants'] + [f'convo{i+1}' for i in range(convos_per_annotator)]
+    # 每个convo拆成3列: id, title, convo(纯对话文本)
+    headers = ['Participants']
+    for i in range(1, convos_per_annotator + 1):
+        headers.extend([f'id{i}', f'title{i}', f'convo{i}'])
 
     # 写入CSV
     with open(output_path, 'w', encoding='utf-8', newline='') as f:
@@ -107,11 +97,12 @@ def save_csv(allocation: Dict[str, List[Dict]], output_path: str, convos_per_ann
         writer.writerow(headers)
 
         for annotator, convos in allocation.items():
-            row = [1]  # Participants = 1，表示这一行由1个人标注
+            row = [1]  # Participants = 1
 
-            # 将每个对话的完整数据转为JSON字符串
             for convo in convos:
-                row.append(json.dumps(convo, ensure_ascii=False))
+                row.append(convo.get('id', ''))
+                row.append(convo.get('text', {}).get('Title', ''))
+                row.append(convo.get('text', {}).get('Conversation', ''))
 
             # 如果不足指定数量，填充空列
             while len(row) < len(headers):
@@ -124,11 +115,13 @@ def save_csv(allocation: Dict[str, List[Dict]], output_path: str, convos_per_ann
 
 def generate_html(convos_per_annotator: int, output_path: str):
     """根据 convo 数量生成 Connect 用的 HTML"""
-    # 隐藏数据 div
-    convo_divs = '\n        '.join(
-        f"<div class=\"convo-raw\" style=\"display:none\">{{{{ task.row_data['convo{i+1}'] }}}}</div>"
-        for i in range(convos_per_annotator)
-    )
+    # 每个convo对应3个隐藏div: id, title, convo
+    convo_divs_list = []
+    for i in range(1, convos_per_annotator + 1):
+        convo_divs_list.append(f'<div class="convo-id" style="display:none">{{{{ task.row_data[\'id{i}\'] }}}}</div>')
+        convo_divs_list.append(f'<div class="convo-title-raw" style="display:none">{{{{ task.row_data[\'title{i}\'] }}}}</div>')
+        convo_divs_list.append(f'<div class="convo-text-raw" style="display:none">{{{{ task.row_data[\'convo{i}\'] }}}}</div>')
+    convo_divs = '\n        '.join(convo_divs_list)
     # 隐藏 answer input
     answer_inputs = '\n        '.join(
         f'<input type="hidden" name="answer_convo{i+1}" id="answer_convo{i+1}" value="">'
@@ -194,15 +187,22 @@ def generate_html(convos_per_annotator: int, output_path: str):
 
 <script>
 (function () {{
-    /* parse all convo data from hidden divs */
-    var slots = document.querySelectorAll('.convo-raw');
+    /* ---- collect convo data from hidden divs ---- */
+    var ids    = document.querySelectorAll('.convo-id');
+    var titles = document.querySelectorAll('.convo-title-raw');
+    var texts  = document.querySelectorAll('.convo-text-raw');
     var convos = [];
-    for (var i = 0; i < slots.length; i++) {{
-        var raw = slots[i].textContent.trim();
-        if (!raw) continue;
-        try {{ convos.push(JSON.parse(raw)); }} catch(e) {{ /* skip */ }}
+    for (var i = 0; i < texts.length; i++) {{
+        var t = texts[i].textContent.trim();
+        if (!t) continue;
+        convos.push({{
+            id:    ids[i] ? ids[i].textContent.trim() : '',
+            title: titles[i] ? titles[i].textContent.trim() : '',
+            convo: t
+        }});
     }}
     var total = convos.length;
+    if (total === 0) return;
     var cur = 0;
     var radios = document.querySelectorAll('input[name="currentAnswer"]');
 
@@ -226,8 +226,8 @@ def generate_html(convos_per_annotator: int, output_path: str):
     }}
     function render() {{
         var c = convos[cur];
-        document.getElementById('convoTitle').textContent = (c && c.text && c.text.Title) || '';
-        document.getElementById('convoBody').textContent = (c && c.text && c.text.Conversation) || '';
+        document.getElementById('convoTitle').textContent = c.title || 'Conversation ' + (cur + 1);
+        document.getElementById('convoBody').textContent  = c.convo || '';
 
         var saved = getAnswer(cur);
         for (var j = 0; j < radios.length; j++) {{
@@ -265,7 +265,7 @@ def generate_html(convos_per_annotator: int, output_path: str):
         window.scrollTo(0, 0);
     }};
 
-    if (total > 0) render();
+    render();
 }})();
 </script>
 </body>
@@ -277,20 +277,22 @@ def generate_html(convos_per_annotator: int, output_path: str):
     print(f"HTML模板已保存到: {output_path}")
 
 
-def save_allocation_json(allocation: Dict[str, List[Dict]], output_path: str, annotators: List[tuple]):
+def save_allocation_json(allocation: Dict[str, List[Dict]], unallocated: List[Dict],
+                         output_path: str, annotators: List[tuple], total_data: int):
     """保存分配情况的JSON文件"""
     allocation_info = {
+        "total_data": total_data,
         "participants": len(annotators),
-        "total_conversations_allocated": sum(len(convos) for convos in allocation.values()),
+        "allocated_count": sum(len(convos) for convos in allocation.values()),
+        "unallocated_count": len(unallocated),
+        "unallocated_ids": [item['id'] for item in unallocated],
         "annotators": []
     }
 
     for name, expected_count in annotators:
-        actual_count = len(allocation.get(name, []))
         annotator_info = {
             "name": name,
-            "expected_count": expected_count,
-            "actual_count": actual_count,
+            "count": len(allocation.get(name, [])),
             "conversation_ids": [item['id'] for item in allocation.get(name, [])]
         }
         allocation_info["annotators"].append(annotator_info)
@@ -352,12 +354,12 @@ def main():
 
     # 分配数据
     print("\n正在分配数据...")
-    allocation = allocate_data(data, annotators)
+    allocation, unallocated = allocate_data(data, annotators)
 
     # 保存结果
     print("\n正在保存结果...")
     save_csv(allocation, default_output_csv, convos_per_annotator)
-    save_allocation_json(allocation, default_output_json, annotators)
+    save_allocation_json(allocation, unallocated, default_output_json, annotators, len(data))
     generate_html(convos_per_annotator, html_output_path)
 
     print("\n" + "="*60)

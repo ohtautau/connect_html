@@ -17,48 +17,20 @@
         </details>
 
         <!-- raw convo data (hidden) -->
-        <div class="convo-raw" style="display:none">{{ task.row_data['convo1'] }}</div>
-        <div class="convo-raw" style="display:none">{{ task.row_data['convo2'] }}</div>
-        <div class="convo-raw" style="display:none">{{ task.row_data['convo3'] }}</div>
-        <div class="convo-raw" style="display:none">{{ task.row_data['convo4'] }}</div>
-        <div class="convo-raw" style="display:none">{{ task.row_data['convo5'] }}</div>
-        <div class="convo-raw" style="display:none">{{ task.row_data['convo6'] }}</div>
-        <div class="convo-raw" style="display:none">{{ task.row_data['convo7'] }}</div>
-        <div class="convo-raw" style="display:none">{{ task.row_data['convo8'] }}</div>
-        <div class="convo-raw" style="display:none">{{ task.row_data['convo9'] }}</div>
-        <div class="convo-raw" style="display:none">{{ task.row_data['convo10'] }}</div>
-        <div class="convo-raw" style="display:none">{{ task.row_data['convo11'] }}</div>
-        <div class="convo-raw" style="display:none">{{ task.row_data['convo12'] }}</div>
-        <div class="convo-raw" style="display:none">{{ task.row_data['convo13'] }}</div>
-        <div class="convo-raw" style="display:none">{{ task.row_data['convo14'] }}</div>
-        <div class="convo-raw" style="display:none">{{ task.row_data['convo15'] }}</div>
-        <div class="convo-raw" style="display:none">{{ task.row_data['convo16'] }}</div>
-        <div class="convo-raw" style="display:none">{{ task.row_data['convo17'] }}</div>
-        <div class="convo-raw" style="display:none">{{ task.row_data['convo18'] }}</div>
-        <div class="convo-raw" style="display:none">{{ task.row_data['convo19'] }}</div>
-        <div class="convo-raw" style="display:none">{{ task.row_data['convo20'] }}</div>
+        <div class="convo-id" style="display:none">{{ task.row_data['id1'] }}</div>
+        <div class="convo-title-raw" style="display:none">{{ task.row_data['title1'] }}</div>
+        <div class="convo-text-raw" style="display:none">{{ task.row_data['convo1'] }}</div>
+        <div class="convo-id" style="display:none">{{ task.row_data['id2'] }}</div>
+        <div class="convo-title-raw" style="display:none">{{ task.row_data['title2'] }}</div>
+        <div class="convo-text-raw" style="display:none">{{ task.row_data['convo2'] }}</div>
+        <div class="convo-id" style="display:none">{{ task.row_data['id3'] }}</div>
+        <div class="convo-title-raw" style="display:none">{{ task.row_data['title3'] }}</div>
+        <div class="convo-text-raw" style="display:none">{{ task.row_data['convo3'] }}</div>
 
         <!-- hidden answer inputs -->
         <input type="hidden" name="answer_convo1" id="answer_convo1" value="">
         <input type="hidden" name="answer_convo2" id="answer_convo2" value="">
         <input type="hidden" name="answer_convo3" id="answer_convo3" value="">
-        <input type="hidden" name="answer_convo4" id="answer_convo4" value="">
-        <input type="hidden" name="answer_convo5" id="answer_convo5" value="">
-        <input type="hidden" name="answer_convo6" id="answer_convo6" value="">
-        <input type="hidden" name="answer_convo7" id="answer_convo7" value="">
-        <input type="hidden" name="answer_convo8" id="answer_convo8" value="">
-        <input type="hidden" name="answer_convo9" id="answer_convo9" value="">
-        <input type="hidden" name="answer_convo10" id="answer_convo10" value="">
-        <input type="hidden" name="answer_convo11" id="answer_convo11" value="">
-        <input type="hidden" name="answer_convo12" id="answer_convo12" value="">
-        <input type="hidden" name="answer_convo13" id="answer_convo13" value="">
-        <input type="hidden" name="answer_convo14" id="answer_convo14" value="">
-        <input type="hidden" name="answer_convo15" id="answer_convo15" value="">
-        <input type="hidden" name="answer_convo16" id="answer_convo16" value="">
-        <input type="hidden" name="answer_convo17" id="answer_convo17" value="">
-        <input type="hidden" name="answer_convo18" id="answer_convo18" value="">
-        <input type="hidden" name="answer_convo19" id="answer_convo19" value="">
-        <input type="hidden" name="answer_convo20" id="answer_convo20" value="">
 
         <!-- progress -->
         <div style="height:6px; background:#e0e0e0; border-radius:3px; margin:12px 0; overflow:hidden;">
@@ -95,15 +67,22 @@
 
 <script>
 (function () {
-    /* parse all convo data from hidden divs */
-    var slots = document.querySelectorAll('.convo-raw');
+    /* ---- collect convo data from hidden divs ---- */
+    var ids    = document.querySelectorAll('.convo-id');
+    var titles = document.querySelectorAll('.convo-title-raw');
+    var texts  = document.querySelectorAll('.convo-text-raw');
     var convos = [];
-    for (var i = 0; i < slots.length; i++) {
-        var raw = slots[i].textContent.trim();
-        if (!raw) continue;
-        try { convos.push(JSON.parse(raw)); } catch(e) { /* skip */ }
+    for (var i = 0; i < texts.length; i++) {
+        var t = texts[i].textContent.trim();
+        if (!t) continue;
+        convos.push({
+            id:    ids[i] ? ids[i].textContent.trim() : '',
+            title: titles[i] ? titles[i].textContent.trim() : '',
+            convo: t
+        });
     }
     var total = convos.length;
+    if (total === 0) return;
     var cur = 0;
     var radios = document.querySelectorAll('input[name="currentAnswer"]');
 
@@ -127,8 +106,8 @@
     }
     function render() {
         var c = convos[cur];
-        document.getElementById('convoTitle').textContent = (c && c.text && c.text.Title) || '';
-        document.getElementById('convoBody').textContent = (c && c.text && c.text.Conversation) || '';
+        document.getElementById('convoTitle').textContent = c.title || 'Conversation ' + (cur + 1);
+        document.getElementById('convoBody').textContent  = c.convo || '';
 
         var saved = getAnswer(cur);
         for (var j = 0; j < radios.length; j++) {
@@ -166,7 +145,7 @@
         window.scrollTo(0, 0);
     };
 
-    if (total > 0) render();
+    render();
 })();
 </script>
 </body>

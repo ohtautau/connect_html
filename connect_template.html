@@ -17,7 +17,9 @@
         </details>
 
         <!-- raw data hidden in DOM -->
-        <div id="convoRaw" style="display:none">{{ task.row_data['convo1'] }}</div>
+        <div id="rawId" style="display:none">{{ task.row_data['id1'] }}</div>
+        <div id="rawTitle" style="display:none">{{ task.row_data['title1'] }}</div>
+        <div id="rawConvo" style="display:none">{{ task.row_data['convo1'] }}</div>
 
         <div style="border:1px solid #d0d0d0; border-radius:8px; padding:20px; margin:16px 0; background:#fafafa;">
             <div id="convoTitle" style="font-size:16px; font-weight:bold; margin-bottom:12px; padding-bottom:8px; border-bottom:2px solid #4a90d9;"></div>
@@ -36,14 +38,8 @@
 
 <script>
 (function () {
-    try {
-        var raw = document.getElementById('convoRaw').textContent.trim();
-        var data = JSON.parse(raw);
-        document.getElementById('convoTitle').textContent = (data.text && data.text.Title) || '';
-        document.getElementById('convoBody').textContent = (data.text && data.text.Conversation) || '';
-    } catch (e) {
-        document.getElementById('convoBody').textContent = document.getElementById('convoRaw').textContent;
-    }
+    document.getElementById('convoTitle').textContent = document.getElementById('rawTitle').textContent.trim() || '';
+    document.getElementById('convoBody').textContent = document.getElementById('rawConvo').textContent.trim() || '';
 })();
 </script>
 </body>
