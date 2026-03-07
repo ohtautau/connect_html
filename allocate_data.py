@@ -114,7 +114,7 @@ def save_csv(allocation: Dict[str, List[Dict]], output_path: str, convos_per_ann
 
 
 def generate_html(convos_per_annotator: int, output_path: str):
-    """根据 convo 数量生成 Connect 用的 HTML"""
+    """根据 convo 数量生成 Connect 用的 HTML（匹配 connect_template.html 的表格+逐行标注样式）"""
     # 每个convo对应3个隐藏div: id, title, convo
     convo_divs_list = []
     for i in range(1, convos_per_annotator + 1):
@@ -122,11 +122,6 @@ def generate_html(convos_per_annotator: int, output_path: str):
         convo_divs_list.append(f'<div class="convo-title-raw" style="display:none">{{{{ task.row_data[\'title{i}\'] }}}}</div>')
         convo_divs_list.append(f'<div class="convo-text-raw" style="display:none">{{{{ task.row_data[\'convo{i}\'] }}}}</div>')
     convo_divs = '\n        '.join(convo_divs_list)
-    # 隐藏 answer input
-    answer_inputs = '\n        '.join(
-        f'<input type="hidden" name="answer_convo{i+1}" id="answer_convo{i+1}" value="">'
-        for i in range(convos_per_annotator)
-    )
 
     html = f'''<html lang='en'>
 <head>
@@ -149,8 +144,8 @@ def generate_html(convos_per_annotator: int, output_path: str):
         <!-- raw convo data (hidden) -->
         {convo_divs}
 
-        <!-- hidden answer inputs -->
-        {answer_inputs}
+        <!-- container for dynamically created hidden answer inputs -->
+        <div id="hiddenAnswers" style="display:none;"></div>
 
         <!-- progress -->
         <div style="height:6px; background:#e0e0e0; border-radius:3px; margin:12px 0; overflow:hidden;">
@@ -158,18 +153,33 @@ def generate_html(convos_per_annotator: int, output_path: str):
         </div>
         <div id="progressText" style="text-align:center; font-size:14px; color:#555;"></div>
 
-        <!-- conversation display -->
-        <div style="border:1px solid #d0d0d0; border-radius:8px; padding:20px; margin:16px 0; background:#fafafa;">
-            <div id="convoTitle" style="font-size:16px; font-weight:bold; margin-bottom:12px; padding-bottom:8px; border-bottom:2px solid #4a90d9;"></div>
-            <div id="convoBody" style="white-space:pre-wrap; line-height:1.7; font-size:14px; color:#333;"></div>
+        <!-- conversation title -->
+        <div id="convoTitle" style="font-size:16px; font-weight:bold; margin:16px 0 0 0; padding-bottom:8px;"></div>
+
+        <!-- table for line-by-line annotation -->
+        <table id="convoTable" style="width:100%; border-collapse:collapse; margin:0 0 16px 0; table-layout:fixed;">
+            <colgroup>
+                <col style="width:70%;">
+                <col style="width:30%;">
+            </colgroup>
+            <thead>
+                <tr>
+                    <th style="text-align:left; padding:10px 12px; border-bottom:2px solid #4a90d9; border-right:1px solid #d0d0d0; font-size:15px;">Conversation</th>
+                    <th style="text-align:left; padding:10px 12px; border-bottom:2px solid #4a90d9; font-size:15px; white-space:nowrap;">Does this sentence contain any harm?</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+
+        <!-- overall question -->
+        <div style="margin:16px 0; padding:14px 16px; background:#eef5fc; border-left:4px solid #4a90d9; border-radius:0 6px 6px 0;">
+            <p style="font-weight:600; margin:0 0 10px 0; font-size:15px;">Does this conversation contain any text or formatting anomalies?</p>
+            <label style="font-size:14px; cursor:pointer; margin-right:14px;"><input type="radio" name="convo_normal" value="Yes" style="margin-right:4px;">Yes</label>
+            <label style="font-size:14px; cursor:pointer; margin-right:14px;"><input type="radio" name="convo_normal" value="No" style="margin-right:4px;">No</label>
         </div>
 
-        <!-- question -->
-        <div style="margin:20px 0; padding:16px; background:#eef5fc; border-left:4px solid #4a90d9; border-radius:0 6px 6px 0;">
-            <p style="font-weight:600; margin:0 0 12px 0;">Does this conversation contain any issues?</p>
-            <label style="margin-right:24px;"><input type="radio" name="currentAnswer" value="Yes"> Yes</label>
-            <label><input type="radio" name="currentAnswer" value="No"> No</label>
-        </div>
+        <!-- validation warning -->
+        <div id="warnMsg" style="color:#c00; font-size:13px; margin:8px 0; display:none;">Please answer all questions before proceeding.</div>
 
         <!-- navigation -->
         <div style="display:flex; justify-content:space-between; align-items:center; margin:24px 0;">
@@ -180,7 +190,7 @@ def generate_html(convos_per_annotator: int, output_path: str):
 
         <!-- submit -->
         <div id="submitRow" style="text-align:center; margin:20px 0; display:none;">
-            <button type="submit" id="submitBtn" disabled style="padding:12px 48px; font-size:15px; font-weight:600; border:none; border-radius:6px; background:#28a745; color:#fff; cursor:pointer;">Submit</button>
+            <button type="submit" id="submitBtn" style="padding:12px 48px; font-size:15px; font-weight:600; border:none; border-radius:6px; background:#28a745; color:#fff; cursor:pointer;">Submit</button>
         </div>
     </form>
 </div>
@@ -198,72 +208,168 @@ def generate_html(convos_per_annotator: int, output_path: str):
         convos.push({{
             id:    ids[i] ? ids[i].textContent.trim() : '',
             title: titles[i] ? titles[i].textContent.trim() : '',
-            convo: t
+            convo: t,
+            lines: t.split('\\n').filter(function (l) {{ return l.trim() !== ''; }})
         }});
     }}
     var total = convos.length;
     if (total === 0) return;
     var cur = 0;
-    var radios = document.querySelectorAll('input[name="currentAnswer"]');
+    var tbody = document.getElementById('tableBody');
+    var normalRadios = document.querySelectorAll('input[name="convo_normal"]');
+    var answerBox = document.getElementById('hiddenAnswers');
 
-    function getAnswer(idx) {{
-        var el = document.getElementById('answer_convo' + (idx + 1));
-        return el ? el.value : '';
+    /* ---- pre-create ALL hidden inputs at init (so they exist in DOM before submit) ---- */
+    var answers = [];
+    for (var ci = 0; ci < total; ci++) {{
+        var obj = {{ lines: {{}}, normal: '', hiddenLines: {{}}, hiddenNormal: null }};
+        var lineCount = convos[ci].lines.length;
+        for (var li = 1; li <= lineCount; li++) {{
+            var inp = document.createElement('input');
+            inp.type = 'hidden';
+            inp.name = 'c' + (ci + 1) + '_line_' + li;
+            inp.value = '';
+            answerBox.appendChild(inp);
+            obj.hiddenLines[li] = inp;
+        }}
+        var nInp = document.createElement('input');
+        nInp.type = 'hidden';
+        nInp.name = 'c' + (ci + 1) + '_normal';
+        nInp.value = '';
+        answerBox.appendChild(nInp);
+        obj.hiddenNormal = nInp;
+        answers.push(obj);
     }}
-    function setAnswer(idx, val) {{
-        var el = document.getElementById('answer_convo' + (idx + 1));
-        if (el) el.value = val;
-    }}
-    function countAnswered() {{
-        var n = 0;
-        for (var k = 0; k < total; k++) {{ if (getAnswer(k)) n++; }}
-        return n;
-    }}
+
     function saveCurrent() {{
-        for (var j = 0; j < radios.length; j++) {{
-            if (radios[j].checked) {{ setAnswer(cur, radios[j].value); return; }}
+        var lineCount = convos[cur].lines.length;
+        for (var i = 1; i <= lineCount; i++) {{
+            var chk = document.querySelector('input[name="line_' + i + '"]:checked');
+            if (chk) {{
+                answers[cur].lines[i] = chk.value;
+                answers[cur].hiddenLines[i].value = chk.value;
+            }}
+        }}
+        for (var j = 0; j < normalRadios.length; j++) {{
+            if (normalRadios[j].checked) {{
+                answers[cur].normal = normalRadios[j].value;
+                answers[cur].hiddenNormal.value = normalRadios[j].value;
+                break;
+            }}
         }}
     }}
+
+    function validateCurrent() {{
+        saveCurrent();
+        var lineCount = convos[cur].lines.length;
+        for (var i = 1; i <= lineCount; i++) {{
+            if (!answers[cur].lines[i]) return false;
+        }}
+        if (!answers[cur].normal) return false;
+        return true;
+    }}
+
+    function countCompleted() {{
+        var n = 0;
+        for (var ci = 0; ci < total; ci++) {{
+            var ok = true;
+            var lineCount = convos[ci].lines.length;
+            for (var li = 1; li <= lineCount; li++) {{
+                if (!answers[ci].lines[li]) {{ ok = false; break; }}
+            }}
+            if (ok && answers[ci].normal) n++;
+        }}
+        return n;
+    }}
+
     function render() {{
         var c = convos[cur];
         document.getElementById('convoTitle').textContent = c.title || 'Conversation ' + (cur + 1);
-        document.getElementById('convoBody').textContent  = c.convo || '';
 
-        var saved = getAnswer(cur);
-        for (var j = 0; j < radios.length; j++) {{
-            radios[j].checked = (radios[j].value === saved);
+        /* rebuild table rows */
+        tbody.innerHTML = '';
+        for (var i = 0; i < c.lines.length; i++) {{
+            var tr = document.createElement('tr');
+            tr.style.background = (i % 2 === 0) ? '#f5f5f5' : '#fff';
+
+            var tdText = document.createElement('td');
+            tdText.style.cssText = 'padding:8px 12px; border-bottom:1px solid #e0e0e0; border-right:1px solid #d0d0d0; font-size:14px; line-height:1.5; word-wrap:break-word; overflow-wrap:break-word;';
+            tdText.textContent = c.lines[i];
+
+            var tdRadio = document.createElement('td');
+            tdRadio.style.cssText = 'padding:8px 12px; border-bottom:1px solid #e0e0e0; text-align:left; white-space:nowrap;';
+            var ln = i + 1;
+            var sv = answers[cur].lines[ln] || '';
+            tdRadio.innerHTML =
+                '<label style="font-size:13px; cursor:pointer; margin-right:10px;"><input type="radio" name="line_' + ln + '" value="Yes"' + (sv === 'Yes' ? ' checked' : '') + ' style="margin-right:3px;">Yes</label>' +
+                '<label style="font-size:13px; cursor:pointer; margin-right:10px;"><input type="radio" name="line_' + ln + '" value="No"' + (sv === 'No' ? ' checked' : '') + ' style="margin-right:3px;">No</label>' +
+                '<label style="font-size:13px; cursor:pointer;"><input type="radio" name="line_' + ln + '" value="N/A"' + (sv === 'N/A' ? ' checked' : '') + ' style="margin-right:3px;">N/A</label>';
+
+            tr.appendChild(tdText);
+            tr.appendChild(tdRadio);
+            tbody.appendChild(tr);
         }}
 
+        /* restore convo_normal */
+        var savedNormal = answers[cur].normal;
+        for (var j = 0; j < normalRadios.length; j++) {{
+            normalRadios[j].checked = (normalRadios[j].value === savedNormal);
+        }}
+
+        /* navigation state */
         document.getElementById('prevBtn').disabled = (cur === 0);
         var isLast = (cur === total - 1);
         document.getElementById('nextBtn').style.display = isLast ? 'none' : '';
         document.getElementById('submitRow').style.display = isLast ? '' : 'none';
+        document.getElementById('warnMsg').style.display = 'none';
 
-        var answered = countAnswered();
-        document.getElementById('progressFill').style.width = (answered / total * 100) + '%';
-        document.getElementById('progressText').textContent = 'Answered ' + answered + ' / ' + total;
+        /* progress */
+        var completed = countCompleted();
+        document.getElementById('progressFill').style.width = (completed / total * 100) + '%';
+        document.getElementById('progressText').textContent = 'Completed ' + completed + ' / ' + total + ' conversations';
         document.getElementById('pageNum').textContent = (cur + 1) + ' / ' + total;
-        document.getElementById('submitBtn').disabled = (answered < total);
     }}
 
-    for (var r = 0; r < radios.length; r++) {{
-        radios[r].addEventListener('change', function () {{
-            saveCurrent();
-            var answered = countAnswered();
-            document.getElementById('progressFill').style.width = (answered / total * 100) + '%';
-            document.getElementById('progressText').textContent = 'Answered ' + answered + ' / ' + total;
-            document.getElementById('submitBtn').disabled = (answered < total);
-        }});
-    }}
-
+    /* ---- navigation ---- */
     window.go = function (dir) {{
-        saveCurrent();
+        if (dir > 0) {{
+            if (!validateCurrent()) {{
+                document.getElementById('warnMsg').style.display = 'block';
+                return;
+            }}
+        }} else {{
+            saveCurrent();
+        }}
         var next = cur + dir;
         if (next < 0 || next >= total) return;
         cur = next;
         render();
         window.scrollTo(0, 0);
     }};
+
+    /* ---- submit validation ---- */
+    document.addEventListener('submit', function (e) {{
+        saveCurrent();
+        for (var ci = 0; ci < total; ci++) {{
+            var lineCount = convos[ci].lines.length;
+            for (var li = 1; li <= lineCount; li++) {{
+                if (!answers[ci].lines[li]) {{
+                    e.preventDefault();
+                    cur = ci;
+                    render();
+                    document.getElementById('warnMsg').style.display = 'block';
+                    return;
+                }}
+            }}
+            if (!answers[ci].normal) {{
+                e.preventDefault();
+                cur = ci;
+                render();
+                document.getElementById('warnMsg').style.display = 'block';
+                return;
+            }}
+        }}
+    }});
 
     render();
 }})();
