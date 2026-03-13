@@ -8,18 +8,46 @@
 import json
 import csv
 import sys
+import random
 from pathlib import Path
 from typing import List, Dict, Any
 
 
-def load_jsonl(file_path: str) -> List[Dict[str, Any]]:
-    """加载JSONL文件"""
+def load_data(file_path: str) -> List[Dict[str, Any]]:
+    """加载JSONL或JSON数组文件，并统一数据格式"""
     data = []
     with open(file_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                data.append(json.loads(line))
+        content = f.read().strip()
+
+        # 尝试解析为JSON数组
+        if content.startswith('['):
+            raw_data = json.loads(content)
+        else:
+            # 解析为JSONL格式
+            raw_data = []
+            for line in content.split('\n'):
+                line = line.strip()
+                if line:
+                    raw_data.append(json.loads(line))
+
+    # 统一数据格式，支持新旧两种格式
+    for item in raw_data:
+        # 检测是新格式还是旧格式
+        if 'post_id' in item and 'conversation' in item:
+            # 新格式: {post_id, conversation, title, ...}
+            normalized = {
+                'id': item.get('post_id', ''),
+                'text': {
+                    'Title': item.get('title', ''),
+                    'Conversation': item.get('conversation', '')
+                }
+            }
+        else:
+            # 旧格式: {id, text: {Title, Conversation}}
+            normalized = item
+
+        data.append(normalized)
+
     return data
 
 
@@ -61,23 +89,28 @@ def get_annotators_info(total_data: int) -> tuple:
 
 
 def allocate_data(data: List[Dict], annotators: List[tuple]) -> tuple:
-    """将数据分配给标注者，返回(已分配, 未分配)"""
+    """将数据随机分配给标注者，返回(已分配, 未分配)"""
+    # 随机打乱数据
+    shuffled_data = data.copy()
+    random.shuffle(shuffled_data)
+
     allocation = {}
     current_idx = 0
     total_needed = sum(count for _, count in annotators)
 
     print(f"\n总共需要分配 {total_needed} 条对话")
     print(f"数据集包含 {len(data)} 条对话")
+    print(f"数据已随机打乱")
 
     for name, count in annotators:
         allocated_items = []
         for _ in range(count):
-            allocated_items.append(data[current_idx])
+            allocated_items.append(shuffled_data[current_idx])
             current_idx += 1
         allocation[name] = allocated_items
         print(f"已为标注者{name}分配 {len(allocated_items)} 条对话")
 
-    unallocated = data[current_idx:]
+    unallocated = shuffled_data[current_idx:]
     if unallocated:
         print(f"\n未分配: {len(unallocated)} 条对话")
 
@@ -97,7 +130,7 @@ def save_csv(allocation: Dict[str, List[Dict]], output_path: str, convos_per_ann
         writer.writerow(headers)
 
         for annotator, convos in allocation.items():
-            row = [1]  # Participants = 1
+            row = [3]  # Participants = 3
 
             for convo in convos:
                 row.append(convo.get('id', ''))
@@ -410,8 +443,11 @@ def save_allocation_json(allocation: Dict[str, List[Dict]], unallocated: List[Di
 
 
 def main():
+    # 设置固定随机种子，确保结果可重复
+    random.seed(42)
+
     # 默认路径
-    default_data_path = r"e:\projects\connect_html\dataset_400_1.jsonl"
+    default_data_path = r"e:\projects\connect_html\sampled_2500.json"
     default_output_csv = r"e:\projects\connect_html\allocated_data.csv"
     default_output_json = r"e:\projects\connect_html\allocation_info.json"
     html_output_path = r"e:\projects\connect_html\connect_upload.html"
@@ -419,6 +455,7 @@ def main():
     print("\n" + "="*60)
     print("欢迎使用数据分配工具")
     print("="*60)
+    print("随机种子: 42 (固定，确保结果可重复)")
 
     # 询问是否使用默认数据路径
     use_default = input(f"\n使用默认数据文件 ({default_data_path})? (y/n): ").strip().lower()
@@ -436,7 +473,7 @@ def main():
     # 加载数据
     print(f"\n正在加载数据...")
     try:
-        data = load_jsonl(data_path)
+        data = load_data(data_path)
         print(f"成功加载 {len(data)} 条对话数据")
     except Exception as e:
         print(f"\n错误：加载数据失败: {e}")
